@@ -5,3 +5,6 @@
 **/tmp/
 **/.turbo/
 *.log
+# Artifact files from code review process
+acceptance-report.json
+review_output.md
