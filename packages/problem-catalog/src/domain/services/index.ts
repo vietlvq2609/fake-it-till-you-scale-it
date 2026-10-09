@@ -1,1 +1,1 @@
-export * from './problem-catalog-service';
+export * from './ProblemCatalogService';

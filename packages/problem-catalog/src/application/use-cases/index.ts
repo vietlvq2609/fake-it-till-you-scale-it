@@ -1,3 +1,3 @@
-export * from './search-problems';
-export * from './get-problem-detail';
-export * from './get-topics';
+export * from './SearchProblemsUseCase';
+export * from './GetProblemDetailUseCase';
+export * from './GetTopicsUseCase';

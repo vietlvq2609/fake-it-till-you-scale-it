@@ -1,1 +1,1 @@
-export * from './tradeoff';
+export * from './Tradeoff';

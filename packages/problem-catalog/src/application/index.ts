@@ -1,3 +1,2 @@
-export * from './ports';
 export * from './use-cases';
-export * from './domain-events';
+export * from './ports';
