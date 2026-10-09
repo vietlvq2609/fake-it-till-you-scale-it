@@ -14,13 +14,7 @@
     "noEmit": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@fake-it/contracts": ["packages/contracts/src"],
-      "@fake-it/shared": ["packages/shared/src"],
-      "@fake-it/problem-catalog": ["packages/problem-catalog/src"]
-    }
+    "sourceMap": true
   },
   "exclude": ["node_modules", "dist", "**/dist/**"]
 }
