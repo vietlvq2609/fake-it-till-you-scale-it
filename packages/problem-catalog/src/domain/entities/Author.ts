@@ -20,6 +20,7 @@ export class Author {
   static create(id: string, name: string, bio: string | null = null): Author {
     const trimmedName = name.trim();
     const trimmedId = id.trim();
+    const trimmedBio = bio?.trim();
 
     if (!trimmedName) {
       throw new ValidationError('Author name cannot be empty');
@@ -31,7 +32,7 @@ export class Author {
     return new Author({
       id: trimmedId,
       name: trimmedName,
-      bio: bio?.trim() ?? null,
+      bio: trimmedBio && trimmedBio.length > 0 ? trimmedBio : null,
     });
   }
 

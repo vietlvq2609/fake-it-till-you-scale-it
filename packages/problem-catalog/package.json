@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@fake-it/contracts": "workspace:*",
-    "@fake-it/shared": "workspace:*"
+    "@fake-it/shared": "workspace:*",
+    "@types/js-yaml": "^4.0.9",
+    "js-yaml": "^5.4.3"
   }
 }
