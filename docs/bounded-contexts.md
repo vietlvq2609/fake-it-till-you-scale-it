@@ -8,8 +8,8 @@ This document tracks the status of each bounded context in the FakeItTillYouScal
 - **Status**: In development
 - **Scope**: Manage the library of system design problems, reference solutions, trade-offs, topics, and related problems.
 - **Storage**: Markdown files with YAML frontmatter (v1)
-- **Architecture**: Four-layer Hexagonal (ports & adapters) — see `docs/ARCHITECTURE.md`
-- **Docs**: `docs/GLOSSARY.md`, `docs/ADR/0001-problem-catalog-bc.md`
+- **Architecture**: Three-layer Hexagonal (ports & adapters) — see `packages/problem-catalog/docs/ARCHITECTURE.md`
+- **Docs**: `packages/problem-catalog/docs/ARCHITECTURE.md`, `packages/problem-catalog/docs/GLOSSARY.md`, `docs/specs/SPEC-0001-problem-catalog.md`, `docs/ADR/0001-problem-catalog-bc.md`
 
 ## 🔬 Deferred (Research Later)
 

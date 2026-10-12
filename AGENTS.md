@@ -17,6 +17,7 @@
 - BC status: `docs/bounded-contexts.md`
 - Glossary: `docs/GLOSSARY.md`
 - ADRs: `docs/ADR/`
+- Specs: `docs/specs/`
 - Turborepo: `turbo.json`
 - Workspace: `pnpm-workspace.yaml`
 
