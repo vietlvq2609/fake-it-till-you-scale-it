@@ -82,17 +82,17 @@ The BC uses a three-layer hexagonal architecture (no Presentation layer yet — 
 |-------|----------------|-----------|
 | **Domain** | Pure business logic. Entities, value objects, domain services, domain events, repository interfaces, domain errors. Zero external dependencies. | `Problem`, `Solution`, `Tradeoff`, `Topic`, `Author`, `ProblemCatalogService`, `IProblemRepository`, `ITopicRepository`, `ProblemPublishedEvent` |
 | **Application** | Use cases + port interfaces. Orchestrates domain objects. Defines outbound ports (file storage, event bus). No framework deps. | `SearchProblemsUseCase`, `GetProblemDetailUseCase`, `GetTopicsUseCase`, `SearchProblemsCommand`, `SearchProblemsResult`, `IFileStorage`, `IEventBus` |
-| **Infrastructure** | Concrete adapters. Implements repository interfaces and outbound ports. In-memory repo, markdown parser, in-memory file storage, in-memory event bus. | `InMemoryProblemRepository`, `MarkdownProblemParser`, `InMemoryFileStorage`, `InMemoryEventBus` |
+| **Infrastructure** | Concrete adapters. Implements repository interfaces and outbound ports. Filesystem repo, markdown parser, filesystem storage, in-memory event bus. | `FilesystemProblemRepository`, `MarkdownProblemParser`, `FileSystemStorage`, `InMemoryEventBus` |
 
 **Port interfaces (Application → Infrastructure):**
-- `IFileStorage` — outbound port for reading/writing markdown content
+- `IFileStorage` — outbound port for reading/writing markdown files
 - `IEventBus` — outbound port for publishing integration events
 
 **Repository interfaces (Domain → Infrastructure):**
 - `IProblemRepository` — domain-owned contract for Problem aggregate persistence
 - `ITopicRepository` — domain-owned contract for Topic persistence
 
-**v1 Implementation**: All infrastructure adapters are **in-memory fakes**. No filesystem, no database, no HTTP. Markdown content is loaded into memory at startup via `InMemoryFileStorage`.
+**v1 Implementation**: Filesystem-based storage for problem content (markdown files in `content/problems/`). `FileSystemStorage` reads files; `MarkdownProblemParser` parses to domain objects; `FilesystemProblemRepository` implements `IProblemRepository`. Event bus is in-memory (`InMemoryEventBus`). No database, no HTTP.
 
 ### 3. Domain Model (Ubiquitous Language)
 
@@ -118,6 +118,8 @@ From `docs/GLOSSARY.md`:
 - Frontmatter holds metadata (title, difficulty, topics, status, author)
 - Body holds prompt, constraints, solutions (with diagrams and trade-offs), related problems
 - Parser: `MarkdownProblemParser` reads directory at startup, produces `Problem` aggregates
+- `FileSystemStorage` reads markdown files from disk
+- `FilesystemProblemRepository` implements `IProblemRepository` using parsed aggregates
 - Rationale: Fastest to demo, git-friendly, natural for PR-based contributions, no DB needed yet
 
 **Example format:**
@@ -155,21 +157,10 @@ graph TD ...
 
 ## Related Problems
 - [Design a Distributed Rate Limiter](./rate-limiter.md)
-```
 
-### 5. API Contract (REST)
+### 5. API Contract (REST) — **Deferred**
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/problems` | List published problems (query: `topic`, `difficulty`, `solutionPattern`) |
-| GET | `/problems/:id` | Get full problem detail |
-| GET | `/topics` | List all topics with counts |
-| POST | `/problems` | Create problem (Draft) — maintainer only |
-| POST | `/problems/:id/publish` | Publish problem — maintainer only |
-| POST | `/problems/:id/solutions` | Add solution — maintainer only |
-| POST | `/problems/:id/related` | Add related problem — maintainer only |
-
-Response shapes follow the domain model. Errors use standard HTTP codes + `{ error: string }` body.
+No Presentation layer in v1. REST API will be added when a consumer (web UI, CLI, or external integration) needs it. Endpoints will follow the domain model (list, get detail, topics, create, publish, add solution, add related).
 
 ### 6. Domain Events
 
@@ -210,8 +201,8 @@ packages/
         ports/
           outbound/
       infrastructure/
-        persistence/     # InMemoryProblemRepository
-        storage/         # InMemoryFileStorage
+        persistence/     # FilesystemProblemRepository
+        storage/         # FileSystemStorage, MarkdownProblemParser
         events/          # InMemoryEventBus
       docs/              # Package-specific docs
         ARCHITECTURE.md
@@ -223,7 +214,7 @@ packages/
 
 **Primary seam: `IProblemRepository`** (domain repository interface)
 
-All use cases depend on this. Tests provide `InMemoryProblemRepository` fake.
+All use cases depend on this. Tests provide `InMemoryProblemRepository` fake (in-memory implementation of the interface).
 
 **Secondary seam: `IFileStorage`** (application outbound port)
 
@@ -234,6 +225,8 @@ Tests provide `InMemoryFileStorage` fake.
 Tests provide `InMemoryEventBus` fake to assert domain events published.
 
 **No mocks** — all fakes are in-memory implementations with real behavior (maps/arrays that persist across calls).
+
+**Note**: Production uses `FilesystemProblemRepository` + `FileSystemStorage`; tests swap in in-memory fakes for speed and isolation.
 
 ## Testing Decisions
 
@@ -254,10 +247,12 @@ Tests provide `InMemoryEventBus` fake to assert domain events published.
 | `CreateProblemUseCase` | Unit: repository.save called with correct Problem |
 | `PublishProblemUseCase` | Unit: validates solutions exist; updates status; fires event |
 | `SearchProblemsUseCase` | Unit: delegates to service; returns correct shape |
-| `InMemoryProblemRepository` | Unit: implements IProblemRepository contract correctly |
+| `FilesystemProblemRepository` | Integration: reads actual markdown files from test fixtures |
 | `MarkdownProblemParser` | Unit: parses frontmatter + body into Problem aggregate |
-| `InMemoryFileStorage` | Unit: implements IFileStorage contract correctly |
+| `FileSystemStorage` | Unit: reads markdown files from disk |
 | `InMemoryEventBus` | Unit: implements IEventBus contract correctly |
+| `InMemoryProblemRepository` (test fake) | Unit: implements IProblemRepository contract correctly |
+| `InMemoryFileStorage` (test fake) | Unit: implements IFileStorage contract correctly |
 
 ### Prior Art
 
@@ -276,8 +271,8 @@ The following are **explicitly not** part of this spec — they belong to deferr
 - **Search index** — Meilisearch/PostgreSQL full-text; v1 uses in-memory filtering
 - **Real-time features** — collaboration, live updates
 - **Multi-tenancy** — organizations, teams, private catalogs
-- **Database** — PostgreSQL, EventStoreDB; v1 is file-based
-- **Admin dashboard** — maintainer UI; v1 is API + markdown files
+- **Database** — PostgreSQL; v1 is filesystem-based
+- **Admin dashboard** — maintainer UI; v1 has no API (direct markdown/TypeScript constants)
 
 ## Further Notes
 
@@ -301,6 +296,8 @@ When Practice Session BC is built:
 3. Keep domain/application unchanged — swap adapter only
 4. Add search index (Meilisearch, database full-text, etc.)
 5. `ProblemPublished` event consumed by Practice Session to hydrate problem snapshots
+
+**From v1 filesystem → v2 database**: Replace `FilesystemProblemRepository` + `FileSystemStorage` with `DatabaseProblemRepository`. Domain & Application layers untouched. Markdown files can remain as migration source or be imported to DB.
 
 ### Open Questions (for future sessions)
 

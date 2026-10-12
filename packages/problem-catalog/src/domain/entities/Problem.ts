@@ -1,4 +1,4 @@
-import { ValidationError } from '../errors';
+import { ValidationError, EmptySolutionError } from '../errors';
 import { Solution } from './Solution';
 import { Topic } from './Topic';
 import { Author } from './Author';
@@ -80,7 +80,7 @@ export class Problem {
       throw new ValidationError('Problem must have at least one topic');
     }
     if (props.status === 'Published' && props.solutions.length === 0) {
-      throw new ValidationError(`Cannot publish problem ${props.id}: must have at least one solution`);
+      throw new EmptySolutionError(props.id);
     }
 
     validateDifficulty(props.difficulty);
@@ -124,7 +124,7 @@ export class Problem {
 
   publish(): Problem {
     if (this.solutions.length === 0) {
-      throw new ValidationError(`Cannot publish problem ${this.id}: must have at least one solution`);
+      throw new EmptySolutionError(this.id);
     }
     if (this.status === 'Published') {
       return this;

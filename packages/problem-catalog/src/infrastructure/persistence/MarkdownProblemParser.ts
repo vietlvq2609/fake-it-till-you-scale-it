@@ -3,6 +3,7 @@ import { Solution } from '../../domain/entities/Solution';
 import { Topic } from '../../domain/entities/Topic';
 import { Author } from '../../domain/entities/Author';
 import { Tradeoff } from '../../domain/value-objects/Tradeoff';
+import * as yaml from 'js-yaml';
 
 export interface ParsedProblem {
   id: string;
@@ -39,43 +40,10 @@ function parseFrontmatter(content: string): { data: Record<string, unknown>; bod
     return { data: {}, body: content };
   }
 
-  const yaml = frontmatterMatch[1];
+  const yamlContent = frontmatterMatch[1];
   const body = content.slice(frontmatterMatch[0].length).trim();
 
-  // Simple YAML parser for our use case
-  const data: Record<string, unknown> = {};
-  const lines = yaml.split('\n');
-  let currentKey: string | null = null;
-  let currentArray: string[] | null = null;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    if (trimmed.startsWith('- ')) {
-      if (currentKey && currentArray !== null) {
-        currentArray.push(trimmed.slice(2).trim());
-      }
-    } else if (trimmed.includes(':')) {
-      const [key, ...valueParts] = trimmed.split(':');
-      const value = valueParts.join(':').trim();
-      currentKey = key.trim();
-
-      if (value.startsWith('[') && value.endsWith(']')) {
-        // Inline array
-        const arr = value.slice(1, -1).split(',').map(v => v.trim());
-        data[currentKey] = arr;
-      } else if (value === '') {
-        // Array starts
-        currentArray = [];
-        data[currentKey] = currentArray;
-      } else {
-        // Simple value
-        currentArray = null;
-        data[currentKey] = value.replace(/^["']|["']$/g, '');
-      }
-    }
-  }
+  const data = yaml.load(yamlContent) as Record<string, unknown>;
 
   return { data, body };
 }
