@@ -74,19 +74,25 @@ This BC is the foundation — all future BCs (Practice Session, Evaluation Engin
 - Other BCs will consume Problem Catalog data via its API or domain events (e.g., `ProblemPublished`).
 - See ADR 0001 for the full decision record.
 
-### 2. Architecture: Hexagonal (Ports & Adapters)
+### 2. Architecture: Three-Layer Hexagonal (Ports & Adapters)
 
-The BC uses a hexagonal architecture with three layers:
+The BC uses a three-layer hexagonal architecture (no Presentation layer yet — API deferred):
 
 | Layer | Responsibility | Key Types |
 |-------|----------------|-----------|
-| **Domain** | Pure business logic. Entities, value objects, domain services, domain errors. No framework deps, no I/O. | `Problem`, `Solution`, `Tradeoff`, `Topic`, `Author`, `ProblemCatalogService` |
-| **Application** | Use cases + port interfaces. Orchestrates domain objects. No framework deps. | `CreateProblemUseCase`, `PublishProblemUseCase`, `SearchProblemsUseCase`, `IProblemCatalogRepository`, `IFileStorage` |
-| **Infrastructure** | Concrete adapters. Filesystem repository, Markdown parser, REST API (Fastify). | `FilesystemProblemRepository`, `MarkdownProblemParser`, `RestApiAdapter` |
+| **Domain** | Pure business logic. Entities, value objects, domain services, domain events, repository interfaces, domain errors. Zero external dependencies. | `Problem`, `Solution`, `Tradeoff`, `Topic`, `Author`, `ProblemCatalogService`, `IProblemRepository`, `ITopicRepository`, `ProblemPublishedEvent` |
+| **Application** | Use cases + port interfaces. Orchestrates domain objects. Defines outbound ports (file storage, event bus). No framework deps. | `SearchProblemsUseCase`, `GetProblemDetailUseCase`, `GetTopicsUseCase`, `SearchProblemsCommand`, `SearchProblemsResult`, `IFileStorage`, `IEventBus` |
+| **Infrastructure** | Concrete adapters. Implements repository interfaces and outbound ports. In-memory repo, markdown parser, in-memory file storage, in-memory event bus. | `InMemoryProblemRepository`, `MarkdownProblemParser`, `InMemoryFileStorage`, `InMemoryEventBus` |
 
-**Port interfaces:**
-- `IProblemCatalogRepository` — inbound port for problem persistence
-- `IFileStorage` — outbound port for reading/writing markdown files
+**Port interfaces (Application → Infrastructure):**
+- `IFileStorage` — outbound port for reading/writing markdown content
+- `IEventBus` — outbound port for publishing integration events
+
+**Repository interfaces (Domain → Infrastructure):**
+- `IProblemRepository` — domain-owned contract for Problem aggregate persistence
+- `ITopicRepository` — domain-owned contract for Topic persistence
+
+**v1 Implementation**: All infrastructure adapters are **in-memory fakes**. No filesystem, no database, no HTTP. Markdown content is loaded into memory at startup via `InMemoryFileStorage`.
 
 ### 3. Domain Model (Ubiquitous Language)
 
@@ -174,10 +180,15 @@ Response shapes follow the domain model. Errors use standard HTTP codes + `{ err
 ### 7. Technology Choices (from research)
 
 - Runtime: Node.js 22 LTS + TypeScript 5.6
-- API: Fastify + type-provider-typescript
 - Validation: Zod (shared schemas in `packages/contracts`)
 - Testing: Vitest
 - Monorepo: Turborepo + pnpm workspaces
+
+**Deferred technology decisions** (to be made per BC when needed):
+- HTTP framework (Fastify, Hono, Express, etc.)
+- Database (PostgreSQL, SQLite, etc.)
+- Message bus (Kafka, NATS, in-memory, etc.)
+- Search index (Meilisearch, PostgreSQL full-text, etc.)
 
 ### 8. Package Structure
 
@@ -186,23 +197,43 @@ packages/
   problem-catalog/     # This BC
     src/
       domain/
+        entities/
+        value-objects/
+        services/
+        repositories/
+        events/
+        errors/
       application/
+        use-cases/
+        commands/
+        results/
+        ports/
+          outbound/
       infrastructure/
+        persistence/     # InMemoryProblemRepository
+        storage/         # InMemoryFileStorage
+        events/          # InMemoryEventBus
+      docs/              # Package-specific docs
+        ARCHITECTURE.md
   contracts/           # Shared Zod schemas (ProblemSchema, etc.)
   shared/              # Cross-cutting (Result type)
 ```
 
 ### 9. Seams for Testing
 
-**Primary seam: `IProblemCatalogRepository`**
+**Primary seam: `IProblemRepository`** (domain repository interface)
 
-All use cases depend on this port. Tests can provide a fake in-memory implementation.
+All use cases depend on this. Tests provide `InMemoryProblemRepository` fake.
 
-**Secondary seam: `IFileStorage`**
+**Secondary seam: `IFileStorage`** (application outbound port)
 
-The filesystem repository depends on this. Tests can provide a fake file system.
+Tests provide `InMemoryFileStorage` fake.
 
-**No other seams needed** — domain logic is pure functions; application layer uses only these two ports.
+**Tertiary seam: `IEventBus`** (application outbound port)
+
+Tests provide `InMemoryEventBus` fake to assert domain events published.
+
+**No mocks** — all fakes are in-memory implementations with real behavior (maps/arrays that persist across calls).
 
 ## Testing Decisions
 
@@ -223,9 +254,10 @@ The filesystem repository depends on this. Tests can provide a fake file system.
 | `CreateProblemUseCase` | Unit: repository.save called with correct Problem |
 | `PublishProblemUseCase` | Unit: validates solutions exist; updates status; fires event |
 | `SearchProblemsUseCase` | Unit: delegates to service; returns correct shape |
-| `FilesystemProblemRepository` | Integration: reads actual markdown files from test fixtures |
+| `InMemoryProblemRepository` | Unit: implements IProblemRepository contract correctly |
 | `MarkdownProblemParser` | Unit: parses frontmatter + body into Problem aggregate |
-| REST endpoints | Integration: full HTTP request → response via test server |
+| `InMemoryFileStorage` | Unit: implements IFileStorage contract correctly |
+| `InMemoryEventBus` | Unit: implements IEventBus contract correctly |
 
 ### Prior Art
 
@@ -264,10 +296,10 @@ Each problem: 2–3 solutions with 2–3 trade-offs each. Hand-written by mainta
 ### Future Migration Path
 
 When Practice Session BC is built:
-1. Add PostgreSQL + Prisma for Problem persistence
-2. Implement `PostgresProblemRepository` implementing `IProblemCatalogRepository`
+1. Add a database (e.g., PostgreSQL) and ORM for Problem persistence
+2. Implement `DatabaseProblemRepository` implementing `IProblemRepository`
 3. Keep domain/application unchanged — swap adapter only
-4. Add search index (Meilisearch or PG full-text)
+4. Add search index (Meilisearch, database full-text, etc.)
 5. `ProblemPublished` event consumed by Practice Session to hydrate problem snapshots
 
 ### Open Questions (for future sessions)

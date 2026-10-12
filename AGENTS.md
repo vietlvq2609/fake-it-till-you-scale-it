@@ -15,22 +15,12 @@
 | Topic | File |
 |-------|------|
 | Code style / format | `.prettierrc` / `tsconfig.json` |
-| Architecture (hexagonal) | `docs/bounded-contexts.md` |
+| **Architecture (monorepo + BC structure)** | `ARCHITECTURE.md` |
+| Bounded context status | `docs/bounded-contexts.md` |
 | Domain model / glossary | `docs/GLOSSARY.md` |
 | ADRs | `docs/ADR/` |
-| Problem Catalog spec | `docs/SPEC-0001-problem-catalog.md` |
 | Turborepo config | `turbo.json` |
 | Workspace config | `pnpm-workspace.yaml` |
-
-## Structure
-
-```
-apps/web          # Next.js frontend (empty)
-packages/
-  contracts       # Shared types/Zod schemas
-  problem-catalog # Problem Catalog BC (core)
-  shared          # Shared utilities
-```
 
 <!-- BEGIN:turborepo-agent-rules -->
 
